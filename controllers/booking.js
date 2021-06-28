@@ -1,5 +1,6 @@
 const booking = require('../models/booking.js')
 const shows = require('../models/shows.js')
+const {successMail,cancelMail} = require('./mail.js')
 
 const newBooking = async (req,res) =>{
     const {userName,userEmail,showID,bookedSeats,bookingAmount} = req.body
@@ -10,7 +11,7 @@ const newBooking = async (req,res) =>{
         let flag = show.bookedSeats.indexOf(bookedSeats[i])
         if(flag !== -1){
             res.status(400).json({error:"Sheet is already Booked"})
-            return 
+            return
         }
     }
     try {
@@ -30,7 +31,7 @@ const newBooking = async (req,res) =>{
             const updated = await shows.findByIdAndUpdate(showID, show, {new : true})
         }
         res.status(200).json({result})
-        
+        successMail({result,show})
     } catch (error) {
         console.log(error)
         res.status(500).json({message:"Something Went Wrong"})
@@ -79,8 +80,27 @@ const searchBooking = async (req,res) =>{
         // }
         res.status(200).json(bookings);
     } catch (error) {
-        res.status(404).json({ message: error.message });
+        res.status(400).json({ message: error.message });
+    }
+}
+const updateBooking = async (req,res) =>{
+    const data = req.body;
+    try {
+        const updatedPost = await booking.findByIdAndUpdate(data._id, data, { new:true })
+        const show = await shows.findById(data.showID)
+        const sheets = updatedPost.bookedSeats.flat().map((i) => parseInt(i))
+        if(sheets.length > 0){
+            for(let i=0;i< sheets.length; i++){
+                show.bookedSeats = show.bookedSeats.filter((id) => id !== sheets[i])
+            }
+            await shows.findByIdAndUpdate(data.showID, show, {new : true})
+        }
+        cancelMail({show,updatedPost})
+        res.status(200).json(updatedPost);        
+    } catch (error) {
+        console.log(error)
+        res.status(400).json({ message: error.message });
     }
 }
 
-module.exports = {newBooking,searchBooking}
+module.exports = {newBooking,searchBooking,updateBooking}
